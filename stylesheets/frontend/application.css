@@ -1,0 +1,147 @@
+/* ==============================
+                Base
+   ============================== */
+body {
+  background-color: #fff;
+  font-family: "jubilat", Georgia, serif; }
+
+pre, code {
+  padding: 0;
+  margin: 0;
+  font-size: 95%;
+  font-family: "Lato",'Helvetica Neue',Helvetica,sans-serif; }
+
+a {
+  color: #795548; }
+
+a:hover {
+  color: #D7CCC8; }
+
+main {
+  margin-bottom: 48px; }
+
+/* ==============================
+            Page Header
+   ============================== */
+.page-header {
+  margin-top: 32px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #ccc; }
+
+.page-header .fa-bars {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  font-size: 24px; }
+
+.page-header .fa-users {
+  position: fixed;
+  left: 24px;
+  top: 24px;
+  font-size: 24px; }
+
+.page-header .menu-opener {
+  color: #000; }
+
+.page-header .icon {
+  display: block;
+  width: 80px;
+  height: 80px;
+  border-radius: 40px;
+  margin: 0 auto; }
+
+.page-header .author {
+  text-align: center; }
+
+/* ==============================
+               Footer
+   ============================== */
+.footer {
+  padding-top: 28px !important;
+  margin-bottom: 16px !important; }
+
+/* ==============================
+            Menu
+   ============================== */
+.menu .icon.fa {
+  font-size: 40px; }
+
+.ui.left.sidebar {
+  /*width: 300px;*/
+  /*text-align: left;*/ }
+
+.ui.menu p {
+  margin: 0;
+  padding: 0;
+  text-align: center; }
+
+/* ==============================
+            Article
+   ============================== */
+article h1.ui.header {
+  font-size: 200%; }
+
+article h2.ui.header {
+  font-size: 150%; }
+
+article .published-date {
+  color: #ccc; }
+
+section article {
+  border-top: 1px solid #ccc;
+  padding-bottom: 8px;
+  padding-top: 16px;
+  cursor: pointer; }
+
+section article:hover {
+  background-color: #EFEBE9; }
+
+section article h1.ui.header {
+  margin-bottom: 0; }
+
+section article .published-date {
+  font-size: 85%; }
+
+section article .published-date a {
+  color: #ccc; }
+
+section article h1.ui.header {
+  font-size: 120%; }
+
+section article a {
+  display: block; }
+
+.pager section {
+  cursor: pointer;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc; }
+
+.pager section a {
+  display: block;
+  width: 100%;
+  height: 100%; }
+
+.pager section a:hover {
+  color: #795548; }
+
+.pager section h1 {
+  font-size: 110%; }
+
+.pager section:hover {
+  background-color: #EFEBE9; }
+
+.pager section.right {
+  border-left: 1px solid #ccc; }
+
+/* ==============================
+               Icons
+   ============================== */
+.ion-beer {
+  color: #FFA000; }
+
+/* ==============================
+            Highlighter
+   ============================== */
+.hljs {
+  background-color: #f5f5ff; }
