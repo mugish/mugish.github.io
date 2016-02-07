@@ -72,7 +72,6 @@
 
 <ul>
 <li><a href="https://github.com/reactjs/react-rails">https://github.com/reactjs/react-rails</a></li>
-<li><code>gem 'react-rails', '~&gt; 1.6.0'</code>をGemfileに追加</li>
 <li>以下からturbolinkを削除
 
 <ul>
@@ -82,8 +81,9 @@
 </ul></li>
 </ul>
 
-<pre><code>bundle install --vendor/bundle
-rails g react:install
+<p># Gemfile</p>
+
+<pre><code>gem 'react-rails', '~&gt; 1.6.0'
 </code></pre>
 
 <p># config/environments/development.rb</p>
@@ -94,6 +94,10 @@ rails g react:install
 <p># config/environments/production.rb</p>
 
 <pre><code>config.react.variant = :production
+</code></pre>
+
+<pre><code>bundle install --vendor/bundle
+rails g react:install
 </code></pre>
 
 <h2 id="generate-files:29d517f3a3cf3e5e26e0e52c0f22769c">Generate files</h2>

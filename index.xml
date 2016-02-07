@@ -21,7 +21,6 @@
 
 &lt;ul&gt;
 &lt;li&gt;&lt;a href=&#34;https://github.com/reactjs/react-rails&#34;&gt;https://github.com/reactjs/react-rails&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;code&gt;gem &#39;react-rails&#39;, &#39;~&amp;gt; 1.6.0&#39;&lt;/code&gt;をGemfileに追加&lt;/li&gt;
 &lt;li&gt;以下からturbolinkを削除
 
 &lt;ul&gt;
@@ -31,8 +30,9 @@
 &lt;/ul&gt;&lt;/li&gt;
 &lt;/ul&gt;
 
-&lt;pre&gt;&lt;code&gt;bundle install --vendor/bundle
-rails g react:install
+&lt;p&gt;# Gemfile&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;gem &#39;react-rails&#39;, &#39;~&amp;gt; 1.6.0&#39;
 &lt;/code&gt;&lt;/pre&gt;
 
 &lt;p&gt;# config/environments/development.rb&lt;/p&gt;
@@ -43,6 +43,10 @@ rails g react:install
 &lt;p&gt;# config/environments/production.rb&lt;/p&gt;
 
 &lt;pre&gt;&lt;code&gt;config.react.variant = :production
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;bundle install --vendor/bundle
+rails g react:install
 &lt;/code&gt;&lt;/pre&gt;
 
 &lt;h2 id=&#34;generate-files:29d517f3a3cf3e5e26e0e52c0f22769c&#34;&gt;Generate files&lt;/h2&gt;
