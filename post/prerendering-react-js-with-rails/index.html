@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>
+    Prerendering React.js with Rails - ムギッシュ！開発ブログ
+  </title>
+
+  <link rel="stylesheet" href="/stylesheets/semantic-ui/semantic.min.css">
+  <link rel="stylesheet" href="/stylesheets/libs.css"/>
+  <link rel="stylesheet" href="/stylesheets/frontend/application.css"/>
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css"/>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  <link rel="alternate" href="/index.xml" type="application/rss+xml" title="ムギッシュ！開発ブログ">
+
+<meta name="generator" content="Hugo 0.15" />
+</head>
+<body>
+  
+  <nav class="ui right vertical inverted sidebar labeled icon menu" id="global-menu">
+    <a class="item">
+      <i class="home icon"></i>
+      Home
+    </a>
+    
+    <a href="https://github.com/mugish" class="item" target="_blank" title="GitHub">
+      <i class="fa fa-github icon"></i>
+      GitHub
+    </a>
+    
+
+    
+    <a href="https://twitter.com/craftbeer_media" class="item" target="_blank" title="Twitter">
+      <i class="fa fa-twitter icon"></i>
+      Twitter
+    </a>
+    
+
+    
+  </nav>
+  <div class="pusher">
+    <header class="ui text container page-header">
+      <a href="/">
+        <img src="/images/logo.png" class="icon">
+      </a>
+      
+      <a href="" class="global-menu-opener" id="global-menu-opener">
+        <i class="fa fa-bars"></i>
+      </a>
+    </header>
+
+
+<main class="ui text container" role="main">
+  <article itemscope itemtype="http://schema.org/BlogPosting">
+    <h1 class="ui header dividing title" itemprop="headline">
+      Prerendering React.js with Rails
+    </h1>
+    <span class="meta">
+      <time class="published-date" itemprop="datePublished" datetime="2016-02-07">
+        February 07, 2016
+      </time>
+    </span>
+    <div itemprop="entry-text" class="content">
+      
+
+<h2 id="install-setup:29d517f3a3cf3e5e26e0e52c0f22769c">Install &amp;&amp; Setup</h2>
+
+<ul>
+<li><a href="https://github.com/reactjs/react-rails">https://github.com/reactjs/react-rails</a></li>
+<li><code>gem 'react-rails', '~&gt; 1.6.0'</code>をGemfileに追加</li>
+<li>以下からturbolinkを削除
+
+<ul>
+<li>Gemfile</li>
+<li>app/assets/javascripts/application.js</li>
+<li>app/views/layouts/application.html.erb</li>
+</ul></li>
+</ul>
+
+<pre><code>bundle install --vendor/bundle
+rails g react:install
+</code></pre>
+
+<p># config/environments/development.rb</p>
+
+<pre><code>config.react.variant = :development
+</code></pre>
+
+<p># config/environments/production.rb</p>
+
+<pre><code>config.react.variant = :production
+</code></pre>
+
+<h2 id="generate-files:29d517f3a3cf3e5e26e0e52c0f22769c">Generate files</h2>
+
+<pre><code>rails g controller home index
+rails g controller comments create
+rails g model comment name:string message:text
+bundle exec rake db:migrate
+</code></pre>
+
+<p># config/routes.rb</p>
+
+<pre><code>Rails.application.routes.draw do
+  root 'home#index'
+  resources :comments, only: [:create]
+end
+</code></pre>
+
+<h2 id="controller:29d517f3a3cf3e5e26e0e52c0f22769c">Controller</h2>
+
+<p># app/controllers/home_controller.rb</p>
+
+<pre><code>class HomeController &lt; ApplicationController
+  def index
+    @comments = Comment.all
+    props = { comments: @comments, url: '/comments' }
+    render component: 'CommentArea', props: props, tag: 'span', class: 'comment'
+  end
+end
+</code></pre>
+
+<p># app/controllers/comments_controller.rb</p>
+
+<pre><code>class CommentsController &lt; ApplicationController
+  def create
+    comment = Comment.create(comment_params)
+    render json: comment, status: :created
+  end
+
+  private
+    def comment_params
+      params.permit(:name, :message)
+    end
+end
+</code></pre>
+
+<h2 id="jsx:29d517f3a3cf3e5e26e0e52c0f22769c">JSX</h2>
+
+<p># app/assets/javascripts/components/comment_form.js.jsx</p>
+
+<pre><code>var CommentForm = React.createClass({
+  handleSubmit: function(e) {
+    e.preventDefault();
+    this.props.onCommentSubmit({ 
+      name: this.refs.name.value.trim(), 
+      message: this.refs.message.value.trim()
+    });
+
+    this.refs.name.value = '';
+    this.refs.message.value = '';
+  },
+  render: function() {
+    return (
+      &lt;form className=&quot;commentForm&quot; onSubmit={this.handleSubmit}&gt;
+        &lt;input type=&quot;text&quot; placeholder=&quot;Your Name&quot; ref=&quot;name&quot; /&gt;
+        &lt;input type=&quot;text&quot; placeholder=&quot;Message...&quot; ref=&quot;message&quot; /&gt;
+        &lt;input type=&quot;submit&quot; value=&quot;Post&quot; /&gt;
+      &lt;/form&gt;
+    );
+  }
+});
+</code></pre>
+
+<p># app/assets/javascripts/components/comment_item.js.jsx</p>
+
+<pre><code>var CommentItem = React.createClass({
+  render: function() {
+    return (
+      &lt;div className=&quot;comment&quot;&gt;
+        &lt;h2 className=&quot;comment-user&quot;&gt;{this.props.comment.name}&lt;/h2&gt;
+        &lt;span className=&quot;comment-message&quot;&gt;{this.props.comment.message}&lt;/span&gt;
+      &lt;/div&gt;
+    );
+  }
+});
+</code></pre>
+
+<p># app/assets/javascripts/components/comment.js.jsx</p>
+
+<pre><code>var CommentArea = React.createClass({
+  getInitialState: function() {
+    return { comments: this.props.comments, isLoading: false };
+  },
+
+  handleCommentSubmit: function(message) {
+    message.id = new Date();
+    $.ajax({
+      url: this.props.url,
+      dataType: 'json',
+      type: 'POST',
+      data: message,
+      success: function(comment) {
+        this.setState({ comments: this.state.comments.concat(comment) });
+      }.bind(this),
+      error: function(_xhr, status, error) {
+        console.error(this.props.url, status, error.toString());
+      }.bind(this)
+    });
+  },
+
+  render: function() {
+
+    var commentItems = this.state.comments.map(function(comment) {
+      return (
+        &lt;CommentItem key={comment.id} comment={comment} /&gt;
+      );
+    });
+
+    return (
+      &lt;div&gt;
+        {commentItems}
+        &lt;CommentForm onCommentSubmit={this.handleCommentSubmit} /&gt;
+      &lt;/div&gt;
+    );
+  }
+});
+</code></pre>
+
+    </div>
+  </article>
+</main>
+
+<div class="ui text container fluid two column grid pager">
+  <section class="left aligned column">
+    
+      &nbsp;
+    
+  </section>
+  <section class="right aligned column">
+    
+      &nbsp;
+    
+  </section>
+</div>
+
+
+    <div class="ui vertical footer segment">
+      <div class="ui center aligned container">
+        
+        <a href="https://twitter.com/craftbeer_media" class="ui twitter button">
+          <i class="twitter icon"></i>
+          Twitter
+        </a>
+        
+        
+        <a href="https://github.com/mugish" class="ui github button">
+          <i class="github icon"></i>
+          GitHub
+        </a>
+        
+        
+        <div class="ui inverted section divider"></div>
+        <div class="ui horizontal small divided link list">
+          <a class="item" href="" target="_blank">&copy; mugish.com All rights reserved.</a>
+          <a class="item" href="http://mugish.com" target="_blank">site designed by mugish.com</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="//code.jquery.com/jquery-2.2.0.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.2/highlight.min.js"></script>
+  <script src="/javascripts/semantic-ui/semantic.min.js"></script>
+  <script src="/javascripts/main.js"></script>
+
+
+</body>
+
+</html>
+

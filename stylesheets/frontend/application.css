@@ -7,7 +7,7 @@ body {
 
 pre, code {
   padding: 0;
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 95%;
   font-family: "Lato",'Helvetica Neue',Helvetica,sans-serif; }
 
@@ -19,6 +19,10 @@ a:hover {
 
 main {
   margin-bottom: 48px; }
+
+p {
+  padding: 0;
+  margin: 0; }
 
 /* ==============================
             Page Header
