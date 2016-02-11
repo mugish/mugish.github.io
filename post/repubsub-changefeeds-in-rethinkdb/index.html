@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+  
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+  <title>
+    repubsub changefeeds in rethinkdb - ムギッシュ！開発ブログ
+  </title>
+
+  <link rel="stylesheet" href="/stylesheets/semantic-ui/semantic.min.css">
+  <link rel="stylesheet" href="/stylesheets/libs.css"/>
+  <link rel="stylesheet" href="/stylesheets/frontend/application.css"/>
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/ionicons/2.0.1/css/ionicons.min.css"/>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.5.0/css/font-awesome.min.css">
+
+  <link rel="alternate" href="/index.xml" type="application/rss+xml" title="ムギッシュ！開発ブログ">
+
+<meta name="generator" content="Hugo 0.15" />
+</head>
+<body>
+  
+  <nav class="ui right vertical inverted sidebar labeled icon menu" id="global-menu">
+    <a class="item">
+      <i class="home icon"></i>
+      Home
+    </a>
+    
+    <a href="https://github.com/mugish" class="item" target="_blank" title="GitHub">
+      <i class="fa fa-github icon"></i>
+      GitHub
+    </a>
+    
+
+    
+    <a href="https://twitter.com/mugishbeer" class="item" target="_blank" title="Twitter">
+      <i class="fa fa-twitter icon"></i>
+      Twitter
+    </a>
+    
+
+    
+  </nav>
+  <div class="pusher">
+    <header class="ui text container page-header">
+      <a href="/">
+        <img src="/images/logo.png" class="icon">
+      </a>
+      
+      <a href="" class="global-menu-opener" id="global-menu-opener">
+        <i class="fa fa-bars"></i>
+      </a>
+    </header>
+
+
+<main class="ui text container" role="main">
+  <article itemscope itemtype="http://schema.org/BlogPosting">
+    <h1 class="ui header dividing title" itemprop="headline">
+      repubsub changefeeds in rethinkdb
+    </h1>
+    <span class="meta">
+      <time class="published-date" itemprop="datePublished" datetime="2016-02-11">
+        February 11, 2016
+      </time>
+    </span>
+    <div itemprop="entry-text" class="content">
+      
+
+<h2 id="rethinkdbを使ってのpubsub:28a1df89c0155abcce018032e8b16dff">RethinkDBを使ってのPubSub</h2>
+
+<p><a href="https://www.rethinkdb.com/docs/publish-subscribe/ruby/">https://www.rethinkdb.com/docs/publish-subscribe/ruby/</a></p>
+
+<h3 id="サンプル:28a1df89c0155abcce018032e8b16dff">サンプル</h3>
+
+<p>公開されているpubsubのサンプルを使って説明したいと思います。
+<a href="https://github.com/rethinkdb/example-pubsub/tree/master/ruby">https://github.com/rethinkdb/example-pubsub/tree/master/ruby</a></p>
+
+<h3 id="ソース:28a1df89c0155abcce018032e8b16dff">ソース</h3>
+
+<p># publish.rb</p>
+
+<pre><code>require 'rethinkdb'
+require_relative 'repubsub'
+
+include RethinkDB::Shortcuts
+
+exchange = Repubsub::Exchange.new(:topics, db: :repubsub, host: 'localhost', port: 28015)
+exchange.topic(&quot;topics.subtopics&quot;).publish({ notice: &quot;topic changed&quot; })
+</code></pre>
+
+<p># subscribe.rb</p>
+
+<pre><code>require 'rethinkdb'
+require_relative 'repubsub'
+
+include RethinkDB::Shortcuts
+
+exchange = Repubsub::Exchange.new(:topics, db: :repubsub, host: 'localhost', port: 28015)
+queue = exchange.queue{|topic| topic.match('topics.subtopics.*')}
+queue.subscription.each do |topic,payload|
+  puts &quot;I got the topic: #{topic}&quot;
+  puts &quot;With the message: #{payload}&quot;
+end
+</code></pre>
+
+<h4 id="実行:28a1df89c0155abcce018032e8b16dff">実行</h4>
+
+<pre><code>rethinkdb
+ruby subscribe.rb
+ruby publish.rb
+</code></pre>
+
+<h4 id="結果:28a1df89c0155abcce018032e8b16dff">結果</h4>
+
+<pre><code>I got the topic: topics.subtopics
+With the message: {&quot;notice&quot;=&gt;&quot;topic changed&quot;}
+</code></pre>
+
+<p>という感じで、簡単に実装できました。</p>
+
+<p>どういう原理で動いてるのかソースをみたところ</p>
+
+<p>subscriptionで最終的に以下のようになっていました。</p>
+
+<pre><code>@table.changes[:new_val].filter{|row| filter_func.call(row[:topic])}
+</code></pre>
+
+<p>@table.changesのところですが、結果的にはRethinkDBの<a href="https://www.rethinkdb.com/docs/changefeeds/ruby/">changefeeds</a>という機能を使ってるようだったので、本当にそうなっているか確かめてみました。</p>
+
+<h3 id="ソース-1:28a1df89c0155abcce018032e8b16dff">ソース</h3>
+
+<p># change.rb</p>
+
+<pre><code>require 'rethinkdb'
+require 'eventmachine'
+require_relative 'repubsub'
+
+include RethinkDB::Shortcuts
+
+conn = r.connect(db: 'repubsub')
+EventMachine.run do
+  r.table('topics').changes().run(conn).each do |change|
+    p change
+  end
+end
+</code></pre>
+
+<h4 id="実行-1:28a1df89c0155abcce018032e8b16dff">実行</h4>
+
+<pre><code>ruby change.rb
+ruby publish.rb
+</code></pre>
+
+<h4 id="結果-1:28a1df89c0155abcce018032e8b16dff">結果</h4>
+
+<p>updated_onが変更になって、<strong><em>changefeeds</em></strong>の機能でsubscriberに対して通知が行くという仕組みです</p>
+
+<p>【注意】2回目の実行なので<strong><em>old_val</em></strong>がありますが1回目の場合はnullです。</p>
+
+<pre><code>{ 
+  &quot;new_val&quot; =&gt;  {
+    &quot;id &quot;=&gt; &quot;faa31cf7-9863-42ad-bca8-5781de2e2cd9&quot;, 
+    &quot;payload&quot; =&gt; {
+      &quot;notice&quot; =&gt; &quot;topic changed&quot;
+    }, 
+    &quot;topic&quot; =&gt; &quot;topics.subtopics&quot;, 
+    &quot;updated_on&quot; =&gt; 2016-02-11 02:25:03 +0000
+  }, 
+  &quot;old_val&quot; =&gt; {
+    &quot;id&quot; =&gt; &quot;faa31cf7-9863-42ad-bca8-5781de2e2cd9&quot;, 
+    &quot;payload&quot; =&gt; {
+      &quot;notice&quot; =&gt; &quot;topic changed&quot;
+    }, 
+    &quot;topic&quot; =&gt; &quot;topics.subtopics&quot;, 
+    &quot;updated_on&quot; =&gt; 2016-02-11 02:16:46 +0000
+  }
+}
+</code></pre>
+
+<h2 id="まとめ:28a1df89c0155abcce018032e8b16dff">まとめ</h2>
+
+<p>指定したDB, テーブルの作成・更新がRethinkDBの<strong><em>changefeeds</em></strong>の機能でqueueに登録されたsubscriberに対して通知がいくというシンプルな作りです。</p>
+
+<p>ちなみに複数のsubscriberのテストをすると</p>
+
+<pre><code>ruby subscribe.rb
+ruby subscribe.rb
+ruby publish.rb
+</code></pre>
+
+<p>とするとそれぞれのsubscriberに</p>
+
+<pre><code>I got the topic: topics.subtopics
+With the message: {&quot;notice&quot;=&gt;&quot;topic changed&quot;}
+</code></pre>
+
+<p>と表示されました。</p>
+
+<h2 id="今回作ったサンプル:28a1df89c0155abcce018032e8b16dff">今回作ったサンプル</h2>
+
+<p><a href="https://github.com/rneuo/repubsub-changefeeds-in-rethinkdb">https://github.com/rneuo/repubsub-changefeeds-in-rethinkdb</a></p>
+
+    </div>
+  </article>
+</main>
+
+<div class="ui text container fluid two column grid pager">
+  <section class="left aligned column">
+    
+      <a href="https://mugish.github.io/post/prerendering-react-js-with-rails/">
+        <i class="arrow circle outline left icon"></i>
+        <h1>React.jsをRailsを使って事前にレンダリング（Prerendering React.js with Rails）</h1>
+      </a>
+    
+  </section>
+  <section class="right aligned column">
+    
+      &nbsp;
+    
+  </section>
+</div>
+
+
+    <div class="ui vertical footer segment">
+      <div class="ui center aligned container">
+        
+        <a href="https://twitter.com/mugishbeer" class="ui twitter button">
+          <i class="twitter icon"></i>
+          Twitter
+        </a>
+        
+        
+        <a href="https://github.com/mugish" class="ui github button">
+          <i class="github icon"></i>
+          GitHub
+        </a>
+        
+        
+        <div class="ui inverted section divider"></div>
+        <div class="ui horizontal small divided link list">
+          <a class="item" href="" target="_blank">&copy; mugish.com All rights reserved.</a>
+          <a class="item" href="http://mugish.com" target="_blank">site designed by mugish.com</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="//code.jquery.com/jquery-2.2.0.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.2/highlight.min.js"></script>
+  <script src="/javascripts/semantic-ui/semantic.min.js"></script>
+  <script src="/javascripts/main.js"></script>
+
+
+</body>
+
+</html>
+

@@ -6,8 +6,152 @@
     <description>Recent content on ムギッシュ！開発ブログ</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sun, 07 Feb 2016 17:51:51 +0900</lastBuildDate>
+    <lastBuildDate>Thu, 11 Feb 2016 10:44:50 +0900</lastBuildDate>
     <atom:link href="https://mugish.github.io/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>repubsub changefeeds in rethinkdb</title>
+      <link>https://mugish.github.io/post/repubsub-changefeeds-in-rethinkdb/</link>
+      <pubDate>Thu, 11 Feb 2016 10:44:50 +0900</pubDate>
+      
+      <guid>https://mugish.github.io/post/repubsub-changefeeds-in-rethinkdb/</guid>
+      <description>
+
+&lt;h2 id=&#34;rethinkdbを使ってのpubsub:28a1df89c0155abcce018032e8b16dff&#34;&gt;RethinkDBを使ってのPubSub&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://www.rethinkdb.com/docs/publish-subscribe/ruby/&#34;&gt;https://www.rethinkdb.com/docs/publish-subscribe/ruby/&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;サンプル:28a1df89c0155abcce018032e8b16dff&#34;&gt;サンプル&lt;/h3&gt;
+
+&lt;p&gt;公開されているpubsubのサンプルを使って説明したいと思います。
+&lt;a href=&#34;https://github.com/rethinkdb/example-pubsub/tree/master/ruby&#34;&gt;https://github.com/rethinkdb/example-pubsub/tree/master/ruby&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;ソース:28a1df89c0155abcce018032e8b16dff&#34;&gt;ソース&lt;/h3&gt;
+
+&lt;p&gt;# publish.rb&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;require &#39;rethinkdb&#39;
+require_relative &#39;repubsub&#39;
+
+include RethinkDB::Shortcuts
+
+exchange = Repubsub::Exchange.new(:topics, db: :repubsub, host: &#39;localhost&#39;, port: 28015)
+exchange.topic(&amp;quot;topics.subtopics&amp;quot;).publish({ notice: &amp;quot;topic changed&amp;quot; })
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;# subscribe.rb&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;require &#39;rethinkdb&#39;
+require_relative &#39;repubsub&#39;
+
+include RethinkDB::Shortcuts
+
+exchange = Repubsub::Exchange.new(:topics, db: :repubsub, host: &#39;localhost&#39;, port: 28015)
+queue = exchange.queue{|topic| topic.match(&#39;topics.subtopics.*&#39;)}
+queue.subscription.each do |topic,payload|
+  puts &amp;quot;I got the topic: #{topic}&amp;quot;
+  puts &amp;quot;With the message: #{payload}&amp;quot;
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;実行:28a1df89c0155abcce018032e8b16dff&#34;&gt;実行&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code&gt;rethinkdb
+ruby subscribe.rb
+ruby publish.rb
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;結果:28a1df89c0155abcce018032e8b16dff&#34;&gt;結果&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code&gt;I got the topic: topics.subtopics
+With the message: {&amp;quot;notice&amp;quot;=&amp;gt;&amp;quot;topic changed&amp;quot;}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;という感じで、簡単に実装できました。&lt;/p&gt;
+
+&lt;p&gt;どういう原理で動いてるのかソースをみたところ&lt;/p&gt;
+
+&lt;p&gt;subscriptionで最終的に以下のようになっていました。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;@table.changes[:new_val].filter{|row| filter_func.call(row[:topic])}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;@table.changesのところですが、結果的にはRethinkDBの&lt;a href=&#34;https://www.rethinkdb.com/docs/changefeeds/ruby/&#34;&gt;changefeeds&lt;/a&gt;という機能を使ってるようだったので、本当にそうなっているか確かめてみました。&lt;/p&gt;
+
+&lt;h3 id=&#34;ソース-1:28a1df89c0155abcce018032e8b16dff&#34;&gt;ソース&lt;/h3&gt;
+
+&lt;p&gt;# change.rb&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;require &#39;rethinkdb&#39;
+require &#39;eventmachine&#39;
+require_relative &#39;repubsub&#39;
+
+include RethinkDB::Shortcuts
+
+conn = r.connect(db: &#39;repubsub&#39;)
+EventMachine.run do
+  r.table(&#39;topics&#39;).changes().run(conn).each do |change|
+    p change
+  end
+end
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;実行-1:28a1df89c0155abcce018032e8b16dff&#34;&gt;実行&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code&gt;ruby change.rb
+ruby publish.rb
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;結果-1:28a1df89c0155abcce018032e8b16dff&#34;&gt;結果&lt;/h4&gt;
+
+&lt;p&gt;updated_onが変更になって、&lt;strong&gt;&lt;em&gt;changefeeds&lt;/em&gt;&lt;/strong&gt;の機能でsubscriberに対して通知が行くという仕組みです&lt;/p&gt;
+
+&lt;p&gt;【注意】2回目の実行なので&lt;strong&gt;&lt;em&gt;old_val&lt;/em&gt;&lt;/strong&gt;がありますが1回目の場合はnullです。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;{ 
+  &amp;quot;new_val&amp;quot; =&amp;gt;  {
+    &amp;quot;id &amp;quot;=&amp;gt; &amp;quot;faa31cf7-9863-42ad-bca8-5781de2e2cd9&amp;quot;, 
+    &amp;quot;payload&amp;quot; =&amp;gt; {
+      &amp;quot;notice&amp;quot; =&amp;gt; &amp;quot;topic changed&amp;quot;
+    }, 
+    &amp;quot;topic&amp;quot; =&amp;gt; &amp;quot;topics.subtopics&amp;quot;, 
+    &amp;quot;updated_on&amp;quot; =&amp;gt; 2016-02-11 02:25:03 +0000
+  }, 
+  &amp;quot;old_val&amp;quot; =&amp;gt; {
+    &amp;quot;id&amp;quot; =&amp;gt; &amp;quot;faa31cf7-9863-42ad-bca8-5781de2e2cd9&amp;quot;, 
+    &amp;quot;payload&amp;quot; =&amp;gt; {
+      &amp;quot;notice&amp;quot; =&amp;gt; &amp;quot;topic changed&amp;quot;
+    }, 
+    &amp;quot;topic&amp;quot; =&amp;gt; &amp;quot;topics.subtopics&amp;quot;, 
+    &amp;quot;updated_on&amp;quot; =&amp;gt; 2016-02-11 02:16:46 +0000
+  }
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&#34;まとめ:28a1df89c0155abcce018032e8b16dff&#34;&gt;まとめ&lt;/h2&gt;
+
+&lt;p&gt;指定したDB, テーブルの作成・更新がRethinkDBの&lt;strong&gt;&lt;em&gt;changefeeds&lt;/em&gt;&lt;/strong&gt;の機能でqueueに登録されたsubscriberに対して通知がいくというシンプルな作りです。&lt;/p&gt;
+
+&lt;p&gt;ちなみに複数のsubscriberのテストをすると&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;ruby subscribe.rb
+ruby subscribe.rb
+ruby publish.rb
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;とするとそれぞれのsubscriberに&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;I got the topic: topics.subtopics
+With the message: {&amp;quot;notice&amp;quot;=&amp;gt;&amp;quot;topic changed&amp;quot;}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;と表示されました。&lt;/p&gt;
+
+&lt;h2 id=&#34;今回作ったサンプル:28a1df89c0155abcce018032e8b16dff&#34;&gt;今回作ったサンプル&lt;/h2&gt;
+
+&lt;p&gt;&lt;a href=&#34;https://github.com/rneuo/repubsub-changefeeds-in-rethinkdb&#34;&gt;https://github.com/rneuo/repubsub-changefeeds-in-rethinkdb&lt;/a&gt;&lt;/p&gt;
+</description>
+    </item>
     
     <item>
       <title>React.jsをRailsを使って事前にレンダリング（Prerendering React.js with Rails）</title>
@@ -180,6 +324,88 @@ end
 &lt;ul&gt;
 &lt;li&gt;&lt;a href=&#34;https://github.com/mugish/prerendering-react-js-with-rails&#34;&gt;https://github.com/mugish/prerendering-react-js-with-rails&lt;/a&gt;&lt;/li&gt;
 &lt;/ul&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>about</title>
+      <link>https://mugish.github.io/about/</link>
+      <pubDate>Mon, 01 Feb 2016 00:00:00 +0900</pubDate>
+      
+      <guid>https://mugish.github.io/about/</guid>
+      <description>
+
+&lt;p&gt;クラフトビールが好きなエンジニアです！&lt;/p&gt;
+
+&lt;p&gt;個人的にはビールとプログラマーって相性がいいのではと勝手に思ってます。&lt;/p&gt;
+
+&lt;p&gt;特にストレスのかかる作業の時にはIPAでホップ注入すると&lt;strong&gt;&lt;em&gt;ノンストレス&lt;/em&gt;&lt;/strong&gt;で作業できます！&lt;/p&gt;
+
+&lt;h2 id=&#34;活動:6083a88ee3411b0d17ce02d738f69d47&#34;&gt;活動&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;アイデアはあるけど、エンジニアがいないようなスタートアップ企業のお手伝い&lt;/li&gt;
+&lt;li&gt;WEB・アプリエンジニアへのキャリアチェンジのお手伝い&lt;/li&gt;
+&lt;li&gt;PHP -&amp;gt; Rubyへの移行お手伝い&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;使用する言語:6083a88ee3411b0d17ce02d738f69d47&#34;&gt;使用する言語&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Ruby
+
+&lt;ul&gt;
+&lt;li&gt;Ruby on Rails&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Swift&lt;/li&gt;
+&lt;li&gt;Objective-C&lt;/li&gt;
+&lt;li&gt;JavaScript
+
+&lt;ul&gt;
+&lt;li&gt;jQuery&lt;/li&gt;
+&lt;li&gt;AngularJS&lt;/li&gt;
+&lt;li&gt;React.js
+
+&lt;ul&gt;
+&lt;li&gt;現在勉強中&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Python
+
+&lt;ul&gt;
+&lt;li&gt;Django&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Golang
+
+&lt;ul&gt;
+&lt;li&gt;現在勉強中&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Scala
+
+&lt;ul&gt;
+&lt;li&gt;現在勉強中&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;PHP
+
+&lt;ul&gt;
+&lt;li&gt;CakePHP&lt;/li&gt;
+&lt;li&gt;Symfony&lt;/li&gt;
+&lt;li&gt;FuelPHP&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Perl
+
+&lt;ul&gt;
+&lt;li&gt;Catalyst&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;ムギッシュ:6083a88ee3411b0d17ce02d738f69d47&#34;&gt;ムギッシュ！&lt;/h2&gt;
+
+&lt;p&gt;クラフトビールで何か面白い事が出来たらと思いサイトを運営していますが、まだ方向性は固まっていません、、&lt;/p&gt;
+
+&lt;p&gt;どなたか興味ある方いらっしゃいましたらお声がけ下さい！&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&#34;http://mugish.com/&#34;&gt;http://mugish.com/&lt;/a&gt;&lt;/p&gt;
 </description>
     </item>
     
